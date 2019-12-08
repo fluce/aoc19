@@ -21,6 +21,7 @@ namespace Day5
                 buffer[1]=state.Value/100; 
                 buffer[2]=state.Value%100;
             }
+            NextPointer=0;
         }
 
         public string Program { get; }
@@ -31,7 +32,7 @@ namespace Day5
         public Action<string> Log {get;set;}
 
         public Func<int> GetNextInput { get; set;}
-        public Action<int> SetOutput {get;set;}
+        public Action<int?> SetOutput {get;set;}
 
         private int NextPointer { get; set;}
 
@@ -98,7 +99,7 @@ namespace Day5
                     }
 
                     case OpCode.OUT: {
-                        NextPointer=RunInstruction_1_0(opcode,buffer,instructionPointer,NextPointer,SetOutput);
+                        NextPointer=RunInstruction_1_0(opcode,buffer,instructionPointer,NextPointer,x=>SetOutput(x));
                         break;
                     }
 

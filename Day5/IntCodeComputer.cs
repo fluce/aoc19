@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace Day5
@@ -10,7 +11,12 @@ namespace Day5
         public IntCodeComputer(string program, int? state=null)
         {
             Program = program;
-            buffer=program.Split(',').Select(int.Parse).ToArray();
+            Reset(state);
+        }
+
+        public void Reset(int? state=null)
+        {
+            buffer=Program.Split(',').Select(int.Parse).ToArray();
             if (state.HasValue) { 
                 buffer[1]=state.Value/100; 
                 buffer[2]=state.Value%100;
@@ -173,6 +179,16 @@ namespace Day5
         public int Result => buffer[0];
 
         public int State => buffer[1]*100+buffer[2];
+
+
+        public static Func<int> GetInputsFrom(params int[] inputs)=>GetInputsFrom(inputs as IEnumerable<int>);
+
+        public static Func<int> GetInputsFrom(IEnumerable<int> inputs)
+        {
+            var enumerator=inputs.GetEnumerator();
+            return ()=>{ enumerator.MoveNext(); return enumerator.Current; };
+        }
+
 
     }
 

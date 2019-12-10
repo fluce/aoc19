@@ -34,6 +34,8 @@ namespace Day10
 
             public bool IsBlocked {get;set;}
             public bool IsVisited {get;set;}
+            public bool IsDestroyed {get;set;}
+            public bool IsCandidate {get;set;}
             public bool IsInfiniteVoid {get;set;}
 
         }
@@ -55,13 +57,18 @@ namespace Day10
             return (maxCell,max);
         }
 
-        public int CountUnblockedAsteroid(Cell from)
+        public int CountUnblockedAsteroid(Cell from)=>GetUnblockedAsteroid(from).Count();
+
+        public bool TraceGetUnblockedAsteroid {get;set;}=false;
+        public bool TraceVaporize {get;set;}=false;
+
+        public IEnumerable<Cell> GetUnblockedAsteroid(Cell from)
         {
             foreach(var a in data) { a.IsBlocked=false; a.IsVisited=false; }
 
             for(int i=1;i<Math.Max(data.GetLength(0),data.GetLength(1));i++) 
             {
-                Log?.Invoke($"Radius = {i}");
+                if (TraceGetUnblockedAsteroid) Log?.Invoke($"Radius = {i}");
                 foreach(var (x,y) in EnumSquare(i)) 
                 {
                     var cell=GetCell(from,x, y);
@@ -77,12 +84,53 @@ namespace Day10
                     }
                     cell.IsVisited=true;
                 }
-                Dump(from);
+                if (TraceGetUnblockedAsteroid) Dump(from);
             }
 
-            int count=0;
-            foreach(var a in data) if (a!=from && a.HasAsteroid && !a.IsBlocked) count++;
-            return count;
+            return EnumArray(data).Where(a=>a!=from && a.HasAsteroid && !a.IsBlocked).OrderBy(a=>(Math.PI+Math.Atan2(a.Y-from.Y,a.X-from.X)+3*Math.PI/2)%(2*Math.PI));
+
+        }
+
+        public IEnumerable<Cell> VaporizeOneRound(Cell from)
+        {
+            foreach (var a in data) a.IsVisited=false;
+            //Dump(from,c=>c.IsVisited?'*':' ');
+            var visibles=GetUnblockedAsteroid(from).ToArray();
+            foreach (var asteroid in visibles) { asteroid.IsCandidate=true; }
+            //Dump(from, true);
+            foreach(var asteroid in visibles)
+            {
+                asteroid.HasAsteroid=false;
+                asteroid.IsDestroyed=true;
+                asteroid.IsCandidate=false;
+                if (TraceVaporize) {
+                    Log?.Invoke($"Vaporized {asteroid.X},{asteroid.Y} : ");
+                    //Dump(from, c=>c.IsDestroyed?'+':'.');
+                    //Dump(from, true);
+                }
+                yield return asteroid;
+            }
+            Dump(from, true);
+        }
+
+        public IEnumerable<Cell> Vaporize(Cell from)
+        {
+            int roundCount=0;
+            int oneRoundCount;
+            do {
+                roundCount++;
+                oneRoundCount=0;
+                if (TraceVaporize) Log?.Invoke($"Round {roundCount}");
+                foreach(var asteroid in VaporizeOneRound(from)) {
+                    oneRoundCount++;
+                    yield return asteroid;
+                }
+            } while (oneRoundCount!=0);
+
+        }
+
+        static IEnumerable<Cell> EnumArray(Cell[,] data) {
+             foreach(var a in data) yield return a;
         }
 
         public Action<string> Log {get;set;}
@@ -102,7 +150,45 @@ namespace Day10
             return 1;
         }
 
-        public void Dump(Cell from)
+        public void Dump(Cell from, bool simple=false)
+        {
+            if (simple)
+                Dump(from, d=> {
+                    if (d.IsCandidate)    
+                        return '+';
+                    else if (d.IsDestroyed)    
+                        return '*';
+                    else if (d.HasAsteroid)    
+                        return '#';
+                    else
+                        return '.';
+                });
+            else
+                Dump(from, d => {
+                    if (d.IsVisited) {
+                        if (d.HasAsteroid && d.IsBlocked)
+                            return 'X';
+                        else if (d.HasAsteroid && !d.IsBlocked)
+                            return '+';
+                        else if (!d.HasAsteroid && !d.IsBlocked)
+                            return '.';
+                        else if (!d.HasAsteroid && d.IsBlocked)
+                            return ':';
+                    } else {
+                        if (d.HasAsteroid && d.IsBlocked)
+                            return 'x';
+                        else if (d.HasAsteroid && !d.IsBlocked)
+                            return '#';
+                        else if (!d.HasAsteroid && !d.IsBlocked)
+                            return ' ';
+                        else if (!d.HasAsteroid && d.IsBlocked)
+                            return '_';
+                    }
+                    return ' ';
+                });
+        }
+
+        public void Dump(Cell from, Func<Cell,char> display)
         {
             var s=new StringBuilder();
             s.Append('\n');
@@ -110,27 +196,9 @@ namespace Day10
             {
                 for(int x=0;x<data.GetLength(0);x++)
                 {
-                    var d=data[x,y];
+                    var d=data[x,y];                    
                     if (d==from) s.Append('O');
-                    else if (d.IsVisited) {
-                        if (d.HasAsteroid && d.IsBlocked)
-                            s.Append('X');
-                        else if (d.HasAsteroid && !d.IsBlocked)
-                            s.Append('+');
-                        else if (!d.HasAsteroid && !d.IsBlocked)
-                            s.Append('.');
-                        else if (!d.HasAsteroid && d.IsBlocked)
-                            s.Append(':');
-                    } else {
-                        if (d.HasAsteroid && d.IsBlocked)
-                            s.Append('x');
-                        else if (d.HasAsteroid && !d.IsBlocked)
-                            s.Append('#');
-                        else if (!d.HasAsteroid && !d.IsBlocked)
-                            s.Append(' ');
-                        else if (!d.HasAsteroid && d.IsBlocked)
-                            s.Append('_');
-                    }
+                    else s.Append(display(d));
                 }
                 s.Append('\n');
             }
@@ -187,11 +255,21 @@ namespace Day10
 ......#..#.#####.#................
 .#....#.#..#.###....##.......##.#.";
 
-            System.Diagnostics.Debugger.Launch();
             var field=new AsteroidField(map.Split(new char[] {'\n','\r'},100,StringSplitOptions.RemoveEmptyEntries));
             var (cell,c) = field.GetMaxVisibilityCell();
 
             Console.WriteLine($"{cell.X} {cell.Y} => {c}");
+            //field.Log=Console.WriteLine;
+            //field.TraceVaporize=true;
+            int i=0;
+            foreach(var asteroid in field.Vaporize(cell))
+            {
+                i++;
+                if (i==200) {
+                    Console.WriteLine($"{i} Vaporized {asteroid.X},{asteroid.Y} => {asteroid.X*100+asteroid.Y}");                
+                }
+            }
+
         }
     }
 }

@@ -5,6 +5,14 @@ using System.Linq;
 namespace Day9
 {
 
+    public class Snapshot
+    {
+        public long[] Buffer;
+        public Dictionary<long,long> AdditionnalMemory;
+        public long NextPointer;
+        public long BaseAddress;
+    }
+
     public class IntCodeComputer
     {
 
@@ -53,11 +61,18 @@ namespace Day9
             END=99,
         }
 
-        public void Execute()
+        public void Execute(Snapshot snapshot=null)
         {
-            NextPointer=0;
-            BaseAddress=0;
-            additionnalMemory.Clear();
+            if (snapshot==null) {
+                NextPointer=0;
+                BaseAddress=0;
+                additionnalMemory.Clear();
+            } else {
+                buffer=snapshot.Buffer.ToArray();
+                additionnalMemory=snapshot.AdditionnalMemory.ToDictionary(x=>x.Key, x=>x.Value);
+                BaseAddress=snapshot.BaseAddress;
+                NextPointer=snapshot.NextPointer;
+            }
 
             var theEnd=false;
             while(!theEnd)
@@ -143,10 +158,12 @@ namespace Day9
                     return 0;
                 } 
                 internal set { 
-                    if (address>=0 && address <computer.buffer.Length)
+                    if (address>=0 && address <computer.buffer.Length) {
                         computer.buffer[address]=value;
-                    else
+                    }
+                    else {
                         computer.additionnalMemory[address]=value;
+                    }
                 }
             }
         }
@@ -240,6 +257,15 @@ namespace Day9
 
         public long State => Memory[1]*100+Memory[2];
 
+        public Snapshot TakeSnapshot()
+        {
+            return new Snapshot() {
+                Buffer=buffer.ToArray(),
+                AdditionnalMemory=additionnalMemory.ToDictionary(x=>x.Key, x=>x.Value),
+                BaseAddress=BaseAddress,
+                NextPointer=NextPointer
+            };
+        }
 
         public static Func<long> GetInputsFrom(params long[] inputs)=>GetInputsFrom(inputs as IEnumerable<long>);
 

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Text;
-using Day9;
+using IntCode;
 
 namespace Day11
 {

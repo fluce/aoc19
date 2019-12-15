@@ -3,6 +3,7 @@ using System.Linq;
 using System.Collections.Generic;
 using Xunit;
 using Xunit.Abstractions;
+using IntCode;
 
 namespace Day9.Tests
 {

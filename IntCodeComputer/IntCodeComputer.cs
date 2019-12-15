@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Day9
+namespace IntCode
 {
 
     public class Snapshot
@@ -251,7 +251,7 @@ namespace Day9
         private string FormatOperand(int modifier, long operand)=>modifier switch { 1=>operand.ToString(), 2=>$"[{BaseAddress}+{operand}]", _=>$"[{operand}]" };
 
         public string Output => string.Join(",",buffer.Select(x=>x.ToString())); 
-        public string DebugOutput => string.Join(",",buffer.Zip(Enumerable.Range(0,buffer.Length)).Select(x=> (x.Second==NextPointer?" ^ ":"")+x.First.ToString())); 
+        public string DebugOutput => string.Join(",",buffer.Zip(Enumerable.Range(0,buffer.Length),(First,Second)=>(First,Second)).Select(x=> (x.Second==NextPointer?" ^ ":"")+x.First.ToString())); 
 
         public long Result => Memory[0];
 

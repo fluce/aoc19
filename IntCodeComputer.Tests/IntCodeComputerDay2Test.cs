@@ -1,4 +1,7 @@
-namespace Day9.Tests
+using Xunit;
+using Xunit.Abstractions;
+
+namespace IntCode.Tests
 {
     public class IntCodeComputerDay2Test
     {

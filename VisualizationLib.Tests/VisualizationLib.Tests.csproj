@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <RootNamespace>VisualizationLib.Tests</RootNamespace>
     <TargetFramework>netcoreapp3.1</TargetFramework>
 
     <IsPackable>false</IsPackable>
@@ -14,7 +15,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\IntCodeComputer\IntCodeComputer.csproj" />
     <ProjectReference Include="..\VisualizationLib\VisualizationLib.csproj" />
   </ItemGroup>
 

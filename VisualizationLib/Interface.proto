@@ -1,0 +1,64 @@
+﻿syntax = "proto3";
+option csharp_namespace = "VisualizationLib";
+
+service Visualization {
+  rpc SendScreen (ScreenMessage) returns (Empty);
+  rpc SendIntCodeTrace (IntCodeTrace) returns (Empty);
+}
+
+message Empty {
+
+}
+
+message ScreenMessage {
+  message ScreenLine {
+      repeated int64 data = 1;
+  }
+  repeated ScreenLine lines = 2;
+  message Translation {
+    TranslationMode mode = 1;
+    string value = 2;
+    string foreGround = 3;
+    string backGround = 4;
+  }
+  map<int64, Translation> translations = 3;
+}
+
+enum TranslationMode {
+    NONE = 0;
+    VALUE = 1;
+    STRING = 2;
+    SYMBOL = 3;
+}
+
+message UUID {
+  bytes value = 1;
+}
+
+message IntCodeTrace {
+  UUID session = 1;  
+  string label = 2;
+
+  int32 index = 3;
+  int64 instructionPointer = 4;
+  int32 opCode = 5;
+  string instruction = 6;
+  int64 baseAddress = 7;
+  message Operand {
+      OperandType type = 1;
+      OperandModifier modifier = 2;
+      int64 value = 3;
+      int64 effectiveValue = 4;
+  }
+  repeated Operand operands = 8;
+}
+enum OperandModifier
+{
+    INDIRECT = 0;
+    DIRECT = 1;
+    RELATIVE = 2;
+}
+enum OperandType {
+    INPUT = 0;
+    OUTPUT = 1;
+}

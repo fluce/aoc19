@@ -13,6 +13,30 @@ namespace IntCode
         public long BaseAddress;
     }
 
+    public interface IDebuggerLink
+    {
+        public enum OperandType { INPUT = 0, OUTPUT = 1 }
+        public enum OperandModifier { INDIRECT = 0, DIRECT = 1, RELATIVE = 2 }
+
+        public class Operand
+        {
+            public OperandType Type { get; set; }
+            public OperandModifier Modifier { get; set; }
+            public long Value { get; set; }
+            public long EffectiveValue { get; set; }
+        }
+
+        public class StepData
+        {
+            public long InstructionPointer { get; set; }
+            public long BaseAddress { get; set; }
+            public IntCodeComputer.OpCode OpCode { get; set; }
+            public List<Operand> Operands { get; set; } = new List<Operand>();
+        }
+
+        void TraceStep(StepData data);
+    }
+
     public class IntCodeComputer
     {
 
@@ -42,13 +66,15 @@ namespace IntCode
         public Action<string> Watch {get;set;}
         public Action<string> Log {get;set;}
 
+        public IDebuggerLink DebuggerLink { get; set; }
+
         public Func<long> GetNextInput { get; set;}
         public Action<long?> SetOutput {get;set;}
 
         private long NextPointer { get; set; }
         private long BaseAddress { get; set; }
 
-        enum OpCode {
+        public enum OpCode {
             ADD=1,
             MUL=2,
             INP=3,
@@ -177,24 +203,37 @@ namespace IntCode
             };
         }
 
-        private long RunInstruction_2_1(int opcode, MemoryAccessor buf, long instructionPointer, long nextPointer, Func<long,long,long> operation)
+        private long RunInstruction_2_1(int opcode, MemoryAccessor buf, long instructionPointer, long nextPointer, Func<long, long, long> operation)
         {
-            var modifiers=opcode/100;
-            opcode%=100;
+            var modifiers = opcode / 100;
+            opcode %= 100;
 
-            var mod1=modifiers%10; modifiers/=10;
-            var mod2=modifiers%10; modifiers/=10;
-            var modR=modifiers%10; modifiers/=10;
+            var mod1 = modifiers % 10; modifiers /= 10;
+            var mod2 = modifiers % 10; modifiers /= 10;
+            var modR = modifiers % 10; modifiers /= 10;
 
-            var operand1=buf[nextPointer++];
-            var operand2=buf[nextPointer++];
-            var resultLocation=buf[nextPointer++];
-            var b1=HandleOperand(buf, operand1, mod1);
-            var b2=HandleOperand(buf, operand2, mod2);
-            var bR=resultLocation+(modR==2?BaseAddress:0);
-            var r=operation(b1,b2);
-            buf[bR]=r;
-            Log?.Invoke($"{instructionPointer,6} {(int)opcode,2:00} {Enum.GetName(typeof(OpCode),opcode)} {FormatOperand(mod1,operand1)} {FormatOperand(mod2,operand2)} => [{resultLocation}]  ({b1} {b2} => {r})");
+            var operand1 = buf[nextPointer++];
+            var operand2 = buf[nextPointer++];
+            var resultLocation = buf[nextPointer++];
+            var b1 = HandleOperand(buf, operand1, mod1);
+            var b2 = HandleOperand(buf, operand2, mod2);
+            var bR = resultLocation + (modR == 2 ? BaseAddress : 0);
+            var bA = BaseAddress;
+            var r = operation(b1, b2);
+            buf[bR] = r;
+
+            DebuggerLink?.TraceStep(new IDebuggerLink.StepData
+            {
+                InstructionPointer = instructionPointer,
+                OpCode = (OpCode)opcode,
+                BaseAddress = bA,
+                Operands = {
+                    new IDebuggerLink.Operand { Type=IDebuggerLink.OperandType.INPUT, Modifier=(IDebuggerLink.OperandModifier)mod1, Value=operand1, EffectiveValue=b1 },
+                    new IDebuggerLink.Operand { Type=IDebuggerLink.OperandType.INPUT, Modifier=(IDebuggerLink.OperandModifier)mod2, Value=operand2, EffectiveValue=b2 },
+                    new IDebuggerLink.Operand { Type=IDebuggerLink.OperandType.OUTPUT, Modifier=(IDebuggerLink.OperandModifier)modR, Value=resultLocation, EffectiveValue=r },
+                }
+            });
+            Log?.Invoke($"{instructionPointer,6} {(int)opcode,2:00} {Enum.GetName(typeof(OpCode), opcode)} {FormatOperand(mod1, operand1)} {FormatOperand(mod2, operand2)} => [{resultLocation}]  ({b1} {b2} => {r})");
             return nextPointer;
         }
 
@@ -206,10 +245,21 @@ namespace IntCode
             var modR=modifiers%10; modifiers/=10;
             var resultLocation=buf[nextPointer++];
             var bR=resultLocation+(modR==2?BaseAddress:0);
+            var bA = BaseAddress;
 
-            var r=operation();
+            var r =operation();
 
             buf[bR]=r;
+
+            DebuggerLink?.TraceStep(new IDebuggerLink.StepData
+            {
+                InstructionPointer = instructionPointer,
+                OpCode = (OpCode)opcode,
+                BaseAddress = bA,
+                Operands = {
+                    new IDebuggerLink.Operand { Type=IDebuggerLink.OperandType.OUTPUT, Modifier=(IDebuggerLink.OperandModifier)modR, Value=resultLocation, EffectiveValue=r },
+                }
+            });
 
             Log?.Invoke($"{instructionPointer,6} {(int)opcode,2:00} {Enum.GetName(typeof(OpCode),opcode)} => [{resultLocation}]  ( => {r})");
             return nextPointer;
@@ -222,7 +272,19 @@ namespace IntCode
             var mod1=modifiers%10; modifiers/=10;
             var operand1=buf[nextPointer++];
             var b1=HandleOperand(buf, operand1, mod1);
+            var bA = BaseAddress;
+
             operation(b1);
+
+            DebuggerLink?.TraceStep(new IDebuggerLink.StepData
+            {
+                InstructionPointer = instructionPointer,
+                OpCode = (OpCode)opcode,
+                BaseAddress = bA,
+                Operands = {
+                    new IDebuggerLink.Operand { Type=IDebuggerLink.OperandType.INPUT, Modifier=(IDebuggerLink.OperandModifier)mod1, Value=operand1, EffectiveValue=b1 },
+                }
+            });
 
             Log?.Invoke($"{instructionPointer,6} {(int)opcode,2:00} {Enum.GetName(typeof(OpCode),opcode)} {FormatOperand(mod1,operand1)} =>  ({b1} => )");
             return nextPointer;
@@ -239,10 +301,23 @@ namespace IntCode
             var operand2=buf[nextPointer++];
             var b1=HandleOperand(buf, operand1, mod1);
             var b2=HandleOperand(buf, operand2, mod2);
+            var bA = BaseAddress;
 
-            var match=test(b1);
+            var match =test(b1);
             if (match) 
                 nextPointer=b2;
+
+            DebuggerLink?.TraceStep(new IDebuggerLink.StepData
+            {
+                InstructionPointer = instructionPointer,
+                OpCode = (OpCode)opcode,
+                BaseAddress = bA,
+                Operands = {
+                    new IDebuggerLink.Operand { Type=IDebuggerLink.OperandType.INPUT, Modifier=(IDebuggerLink.OperandModifier)mod1, Value=operand1, EffectiveValue=b1 },
+                    new IDebuggerLink.Operand { Type=IDebuggerLink.OperandType.INPUT, Modifier=(IDebuggerLink.OperandModifier)mod2, Value=operand2, EffectiveValue=b2 },
+                    new IDebuggerLink.Operand { Type=IDebuggerLink.OperandType.OUTPUT, Value=match?1:0, EffectiveValue=nextPointer },
+                }
+            });
 
             Log?.Invoke($"{instructionPointer,6} {(int)opcode,2:00} {Enum.GetName(typeof(OpCode),opcode)} {FormatOperand(mod1,operand1)} {FormatOperand(mod2,operand2)} =>  ({b1} => {(match?"MATCHED ":"")}nextPointer={nextPointer})");
             return nextPointer;

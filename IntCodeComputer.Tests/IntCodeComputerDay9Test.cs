@@ -4,16 +4,18 @@ using System.Collections.Generic;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace Day9.Tests
+namespace IntCode.Tests
 {
 
     public class IntCodeComputerDay9Test
     {
         private readonly ITestOutputHelper console;
+        private readonly VisualizationLib.Client visualizationClient;
 
         public IntCodeComputerDay9Test(ITestOutputHelper console)
         {
             this.console = console;
+            visualizationClient = new VisualizationLib.Client("https://localhost:5001");
         }
 
         [Fact]
@@ -24,6 +26,7 @@ namespace Day9.Tests
             var output=new List<long>();
             impl.Log=(x)=>console.WriteLine(x);
             impl.SetOutput=x=>output.Add(x.Value);
+            impl.DebuggerLink = visualizationClient.DebuggerLink(nameof(IntCodeComputerDay9Test) +"."+nameof(TestRelative));
             impl.Execute();
             Assert.Equal(program, string.Join(",",output.Select(x=>x.ToString())));
         }
@@ -36,6 +39,7 @@ namespace Day9.Tests
             var output=new List<long>();
             impl.Log=(x)=>console.WriteLine(x);
             impl.SetOutput=x=>output.Add(x.Value);
+            impl.DebuggerLink = visualizationClient.DebuggerLink(nameof(IntCodeComputerDay9Test) + "." + nameof(TestLongMul));
             impl.Execute();
             Assert.Single(output);
             Assert.Equal(16, output.Single().ToString().Length);
@@ -49,6 +53,7 @@ namespace Day9.Tests
             var output=new List<long>();
             impl.Log=(x)=>console.WriteLine(x);
             impl.SetOutput=x=>output.Add(x.Value);
+            impl.DebuggerLink = visualizationClient.DebuggerLink(nameof(IntCodeComputerDay9Test) + "." + nameof(TestLongOutput));
             impl.Execute();
             Assert.Single(output);
             Assert.Equal("1125899906842624", output.Single().ToString());
@@ -62,6 +67,7 @@ namespace Day9.Tests
             var output=new List<long>();
             impl.Log=(x)=>console.WriteLine(x);
             impl.GetNextInput=()=>999;
+            impl.DebuggerLink = visualizationClient.DebuggerLink(nameof(IntCodeComputerDay9Test) + "." + nameof(TestRelativeResult));
             impl.Execute();
             Assert.Equal(999, impl.Memory[10]);
         }

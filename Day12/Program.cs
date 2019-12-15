@@ -45,6 +45,10 @@ namespace Day12
             return $"<x={X}, y={Y}, z={Z}> <vx={vX}, vy={vY}, vz={vZ}>";
         }
 
+        public override int GetHashCode()
+        {
+            return base.GetHashCode();
+        }
     }
 
     public class JupiterSystem

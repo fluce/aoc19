@@ -157,7 +157,7 @@ namespace IntCode
                         return value;
                     return 0;
                 } 
-                internal set { 
+                set { 
                     if (address>=0 && address <computer.buffer.Length) {
                         computer.buffer[address]=value;
                     }

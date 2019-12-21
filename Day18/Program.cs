@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.Collections.Generic;
-using FibonacciHeap;
+using Utils;
 
 namespace Day18
 {
@@ -59,40 +59,16 @@ namespace Day18
 
         public int? FindBestPath((int x,int y) start, (int x,int y) dest)
         {
-            var dists=new Dictionary<(int x, int y), int>();
-            var prevs=new Dictionary<(int x, int y), (int x, int y)>();
-            var queue=new FibonacciHeap<(int x, int y),int>(0);
-            var nodes=new Dictionary<(int x, int y),FibonacciHeapNode<(int x, int y), int>>(); 
+            var path=Utils.Dijkstra.FindBestPath<(int x,int y), Utils.Dijkstra.IntCost>(
+                Each((x,y,c)=>c!='#').Select(i=>(i.x,i.y)),
+                start, dest,
+                a=>GetNeighbor(a,this[dest.x,dest.y]),
+                (a,b)=>1
+            );
 
-            dists[start]=0;
-            foreach (var (x,y,c) in Each((x,y,c)=>c!='#')) {
-                if ((x,y)!=start) dists[(x,y)]=1000000;
-                prevs[(x,y)]=(-1,-1);
-                nodes[(x,y)]=new FibonacciHeapNode<(int x, int y), int>((x,y),dists[(x,y)]);
-                queue.Insert(nodes[(x,y)]);
-            }
-
-            while (!queue.IsEmpty()) {
-                var minNode=queue.RemoveMin();
-                nodes.Remove(minNode.Data);
-                var (u,distu)=(minNode.Data,minNode.Key);
-                /*if (distu!=1000000)
-                    Console.WriteLine($"queueSize={queue.Size()} current_node={u} dist={distu}");*/
-                foreach (var n in GetNeighbor(u,this[dest.x,dest.y]).Where(x=>nodes.ContainsKey(x)))
-                {
-                    var d=distu+1;
-                    if (d<dists[n]) // this one is better
-                    {
-                        dists[n]=d;
-                        prevs[n]=u;
-                        queue.DecreaseKey(nodes[n],d);
-                    }
-                }
-
-            }
             //Console.WriteLine($"Queue is empty ! {prevs.Count} {dists.Count}");            
-            var s=dists[dest];
-            return s<1000000?s:(int?)null;
+            var s=path.LastOrDefault();
+            return path.Any()?path.LastOrDefault().Cost.Value:(int?)null;
             //foreach (var a in dists) if (a.Value<1000000) this[a.Key.x,a.Key.y]='+';
             /*while (s!=start) {
                 s=prevs[s];

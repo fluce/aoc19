@@ -15,7 +15,10 @@ namespace Day18
             Data=data;
             Width=data[0].Length;
             Height=data.Length;
+            mazeCells=Each((x,y,c)=>c!='#').Select(i=>(i.x,i.y)).ToArray();
         }
+
+        (int x, int y)[] mazeCells;
 
         public static char[][] Parse(string[] data)=>data.Select(x=>x.ToCharArray()).ToArray();
 
@@ -48,13 +51,43 @@ namespace Day18
         {
             var (x,y)=p;
             if (this[x-1,y]=='.') yield return (x-1,y);
+            else if (char.IsLower(this[x-1,y])) yield return (x-1,y);
+            else if (this[x-1,y]==target) yield return (x-1,y);
             if (this[x+1,y]=='.') yield return (x+1,y);
+            else if (char.IsLower(this[x+1,y])) yield return (x+1,y);
+            else if (this[x+1,y]==target) yield return (x+1,y);
             if (this[x,y-1]=='.') yield return (x,y-1);
+            else if (char.IsLower(this[x,y-1])) yield return (x,y-1);
+            else if (this[x,y-1]==target) yield return (x,y-1);
             if (this[x,y+1]=='.') yield return (x,y+1);
-            if (this[x-1,y]==target) yield return (x-1,y);
-            if (this[x+1,y]==target) yield return (x+1,y);
-            if (this[x,y-1]==target) yield return (x,y-1);
-            if (this[x,y+1]==target) yield return (x,y+1);
+            else if (char.IsLower(this[x,y+1])) yield return (x,y+1);            
+            else if (this[x,y+1]==target) yield return (x,y+1);
+        }
+
+        public IEnumerable<(int x, int y)> GetNeighbor((int x,int y) p)
+        {
+            var (x,y)=p;
+            if (this[x-1,y]!='#') yield return (x-1,y);
+            if (this[x+1,y]!='#') yield return (x+1,y);
+            if (this[x,y-1]!='#') yield return (x,y-1);
+            if (this[x,y+1]!='#') yield return (x,y+1);
+         }
+
+        public int? CalcDist(char from, char to)
+        {
+            var start=Each((x,y,c)=>c==from).SingleOrDefault();
+            var dest=Each((x,y,c)=>c==to).SingleOrDefault();
+            if (start.x==0 || dest.x==0) return null;
+            var path=Utils.Dijkstra.FindBestPath<(int x,int y), Utils.Dijkstra.IntCost>(
+                mazeCells,
+                (start.x,start.y), (dest.x,dest.y),
+                a=>GetNeighbor(a,to),
+                (a,b)=>1
+            );
+            var d=path.LastOrDefault();
+            if (d.Node.x==0||d.Cost.Value==int.MaxValue)
+                return null;
+            return d.Cost.Value;
         }
 
         public int? FindBestPath((int x,int y) start, (int x,int y) dest)
@@ -180,8 +213,42 @@ namespace Day18
 
     }
 
+    class DistanceMatrix
+    {
+        public int?[,] Distances{get;}=new int?[53,53];
+
+        public int GetIndex(char c)
+        {
+            if (c=='@') return 0;
+            if (char.IsLower(c)) 
+            {
+                return 1+Convert.ToInt32(c)-Convert.ToInt32('a');
+            } else 
+                return 27+Convert.ToInt32(c)-Convert.ToInt32('A');
+        }
+
+        public void Dump()
+        {
+            Console.Write("  ");
+            foreach(var i in Program.Keys)
+                Console.Write($"{i,4}");
+            Console.WriteLine();
+            foreach(var j in Program.Keys)
+            {
+                Console.Write($"{j} ");
+                foreach(var i in Program.Keys)
+                    Console.Write($"{Distances[GetIndex(i),GetIndex(j)],4}");
+                Console.WriteLine();
+            }
+        }
+    }
+
     class Program
     {
+        //public static List<char> Keys="@abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ".ToList();
+        public static List<char> Keys="@dglsvzrchntaequbpwkjfmyxoiVZCGNELQWBSAHFJIKDMOPRTUXY".ToList();
+       
+ 
         static void Main(string[] args)
         {
             var root=new Maze.TestItem();
@@ -191,6 +258,67 @@ namespace Day18
             var copy=Maze.Parse(file);
             Maze m=new Maze(initData);
 
+            Console.WriteLine(m.Dump());
+/*            var doorLocation=m.Each((x,y,c)=>c=='V').Single();
+            m[doorLocation.x,doorLocation.y]='.';
+            doorLocation=m.Each((x,y,c)=>c=='Z').Single(); // get access to CGNL
+            m[doorLocation.x,doorLocation.y]='.';
+            doorLocation=m.Each((x,y,c)=>c=='C').Single(); // get access to eS
+            m[doorLocation.x,doorLocation.y]='.';
+            doorLocation=m.Each((x,y,c)=>c=='G').Single(); // get access to B
+            m[doorLocation.x,doorLocation.y]='.'; 
+            doorLocation=m.Each((x,y,c)=>c=='N').Single(); // get access to 
+            m[doorLocation.x,doorLocation.y]='.'; 
+            doorLocation=m.Each((x,y,c)=>c=='L').Single(); // get access to 
+            m[doorLocation.x,doorLocation.y]='.'; 
+            doorLocation=m.Each((x,y,c)=>c=='E').Single(); // get access to qQ
+            m[doorLocation.x,doorLocation.y]='.';             
+            doorLocation=m.Each((x,y,c)=>c=='Q').Single(); // get access to ubUB
+            m[doorLocation.x,doorLocation.y]='.';               
+            doorLocation=m.Each((x,y,c)=>c=='U').Single(); // get access to 
+            m[doorLocation.x,doorLocation.y]='.';               
+            doorLocation=m.Each((x,y,c)=>c=='B').Single(); // get access to 
+            m[doorLocation.x,doorLocation.y]='.';   
+            doorLocation=m.Each((x,y,c)=>c=='A').Single(); // get access to pwH
+            m[doorLocation.x,doorLocation.y]='.';                           
+            doorLocation=m.Each((x,y,c)=>c=='S').Single(); // get access to D
+            m[doorLocation.x,doorLocation.y]='.';                           
+            doorLocation=m.Each((x,y,c)=>c=='H').Single(); // get access to T
+            m[doorLocation.x,doorLocation.y]='.';                           
+            doorLocation=m.Each((x,y,c)=>c=='W').Single(); // get access to P
+            m[doorLocation.x,doorLocation.y]='.';                           
+            doorLocation=m.Each((x,y,c)=>c=='P').Single(); // get access to 
+            m[doorLocation.x,doorLocation.y]='.';                           
+            doorLocation=m.Each((x,y,c)=>c=='D').Single(); // get access to 
+            m[doorLocation.x,doorLocation.y]='.';   
+            doorLocation=m.Each((x,y,c)=>c=='T').Single(); // get access to R
+            m[doorLocation.x,doorLocation.y]='.'; 
+            doorLocation=m.Each((x,y,c)=>c=='R').Single(); // get access to kK
+            m[doorLocation.x,doorLocation.y]='.'; 
+            doorLocation=m.Each((x,y,c)=>c=='K').Single(); // get access to jJ
+            m[doorLocation.x,doorLocation.y]='.'; 
+            doorLocation=m.Each((x,y,c)=>c=='J').Single(); // get access to fF
+            m[doorLocation.x,doorLocation.y]='.'; 
+            doorLocation=m.Each((x,y,c)=>c=='F').Single(); // get access to mM
+            m[doorLocation.x,doorLocation.y]='.'; 
+            doorLocation=m.Each((x,y,c)=>c=='M').Single(); // get access to yY
+            m[doorLocation.x,doorLocation.y]='.'; 
+            doorLocation=m.Each((x,y,c)=>c=='Y').Single(); // get access to xX
+            m[doorLocation.x,doorLocation.y]='.'; 
+            doorLocation=m.Each((x,y,c)=>c=='X').Single(); // get access to oO
+            m[doorLocation.x,doorLocation.y]='.'; 
+            doorLocation=m.Each((x,y,c)=>c=='O').Single(); // get access to iI
+            m[doorLocation.x,doorLocation.y]='.'; 
+*/
+            var distanceMatrix=new DistanceMatrix();
+            foreach (var f in Keys)
+                foreach (var t in Keys)
+                    if (f!=t)
+                        distanceMatrix.Distances[distanceMatrix.GetIndex(f),distanceMatrix.GetIndex(t)]=m.CalcDist(f,t);
+
+            distanceMatrix.Dump();
+
+/*
             string prevPath="";
             string minPath="";
             int min=int.MaxValue;
@@ -210,6 +338,7 @@ namespace Day18
                 m.Recalc(root);
             } while(!root.AllChildrenTested);
             //m.Dump(root);
+            */
         }
     }
 }

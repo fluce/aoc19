@@ -17,7 +17,7 @@ namespace Utils
             Height=data.Length;*/
         }
 
-        public T OutsideValue {get;set;} = default(T);
+        public Func<(int x,int y),T> OutsideValue {get;set;} = p=>default(T);
         public static Table<T> Parse(string[] data, Func<(int x,int y), char, T> convertor) 
         {
             var t=new Table<T>() {
@@ -38,7 +38,7 @@ namespace Utils
         public T this[int x,int y] {
             get {
                 if (x<0 || y<0 || x>=Width || y>=Height)
-                    return OutsideValue;
+                    return OutsideValue((x,y));
                 return Data[y*Width+x];
             }
             set {
@@ -49,16 +49,16 @@ namespace Utils
 
         public IEnumerable<(int X, int Y, T Item)> Each(Func<int,int,T,bool> predicate=null)
         {
-            for (int i=0;i<Width;i++)
-                for (int j=0;j<Height;j++)
+            for (int j=0;j<Height;j++)
+                for (int i=0;i<Width;i++)
                     if (predicate?.Invoke(i,j,this[i,j])??true)
                         yield return (i,j,this[i,j]);
         }
 
         public IEnumerable<((int X,int Y) Position, T Item)> Each(Func<(int X,int Y),T,bool> predicate=null)
         {
-            for (int i=0;i<Width;i++)
-                for (int j=0;j<Height;j++)
+            for (int j=0;j<Height;j++)
+                for (int i=0;i<Width;i++)
                     if (predicate?.Invoke((i,j),this[i,j])??true)
                         yield return ((i,j),this[i,j]);
         }

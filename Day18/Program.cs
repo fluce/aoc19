@@ -161,9 +161,37 @@ namespace Day18
                     
         }
 
-        public (string,int,int) Solve(TestItem root, int currentMinDist)
+        public (string Path,int Dist) FindBest(char[][] copy,char startC, string stops)
         {
-            var start=Each((x,y,c)=>c=='@').Single();
+            var root=new Maze.TestItem();
+            string prevPath="";
+            string minPath="";
+            int min=int.MaxValue;
+            for(int i=0;i<Data.Length;i++) Array.Copy(Data[i],copy[i],copy[i].Length);
+
+            do {
+                for(int i=0;i<Data.Length;i++) Array.Copy(copy[i],Data[i],copy[i].Length);
+                var (path,len,c)=Solve(root, min, startC,stops);
+                if (len>=0) {
+                    if (len<min)
+                    {
+                        min=len;
+                        minPath=path;
+                    } else {
+                        if (path==prevPath) break;
+                        prevPath=path;
+                    }
+                }
+                Recalc(root);
+            } while(!root.AllChildrenTested);
+            Console.WriteLine($"Optimal path : {minPath} => {min}");
+            for(int i=0;i<Data.Length;i++) Array.Copy(copy[i],Data[i],copy[i].Length);
+            return (minPath,min); 
+        }
+
+        public (string,int,int) Solve(TestItem root, int currentMinDist, char startC, string stops)
+        {
+            var start=Each((x,y,c)=>c==startC).Single();
             //Console.WriteLine($"starting at {start}");
 
             int totalDist=0;
@@ -172,7 +200,7 @@ namespace Day18
 
             int counter=0;
 
-            List<char> keys="abcdefghijklmnopqrstuvwxyz".ToList();
+            List<char> keys=stops.ToList();
 
             while (keys.Count>0) {
                 if (!item.Initialized) {
@@ -194,9 +222,9 @@ namespace Day18
                 totalDist+=item.Dist.Value;
                 if (totalDist>currentMinDist) { item.AllChildrenTested=true; /*Console.WriteLine($"{orderedKeys} skipped => {totalDist}");*/ return ("", -2, counter); }
                 //Console.WriteLine($"{orderedKeys} Key {item.Key}, totalDist={totalDist} ({item.Tested})");
-                var doorLocation=Each((x,y,c)=>c==char.ToUpper(item.Key)).Single();
+                //var doorLocation=Each((x,y,c)=>c==char.ToUpper(item.Key)).Single();
                 //Console.WriteLine($"Opening door at {doorLocation}");
-                this[doorLocation.x,doorLocation.y]='.'; // open door
+                //this[doorLocation.x,doorLocation.y]='.'; // open door
                 var keyLocation=Each((x,y,c)=>c==item.Key).Single();
                 this[keyLocation.x,keyLocation.y]='.'; // remove key
                 keys.Remove(item.Key); // remove key;
@@ -210,10 +238,23 @@ namespace Day18
 
             return (orderedKeys, totalDist, counter);
         }
+        public void OpenDoor(char door) 
+        {
+            var doorLocation=Each((x,y,c)=>c==door).Single();
+            this[doorLocation.x,doorLocation.y]='.';
+        }
 
+        public DistanceMatrix BuildDistanceMatrix(IEnumerable<char> keys)
+        {
+            var distanceMatrix=new DistanceMatrix();
+            foreach (var f in keys)
+                foreach (var t in keys)                    
+                    distanceMatrix.Distances[distanceMatrix.GetIndex(f),distanceMatrix.GetIndex(t)]=f==t?0:CalcDist(f,t);
+            return distanceMatrix;
+        }
     }
 
-    class DistanceMatrix
+    public class DistanceMatrix
     {
         public int?[,] Distances{get;}=new int?[53,53];
 
@@ -227,7 +268,7 @@ namespace Day18
                 return 27+Convert.ToInt32(c)-Convert.ToInt32('A');
         }
 
-        public void Dump()
+        public DistanceMatrix Dump(DistanceMatrix prev=null)
         {
             Console.Write("  ");
             foreach(var i in Program.Keys)
@@ -237,28 +278,92 @@ namespace Day18
             {
                 Console.Write($"{j} ");
                 foreach(var i in Program.Keys)
-                    Console.Write($"{Distances[GetIndex(i),GetIndex(j)],4}");
+                    if (prev==null)
+                        Console.Write($"{Distances[GetIndex(i),GetIndex(j)],4}");
+                    else
+                        Console.Write($"{Distances[GetIndex(i),GetIndex(j)]-prev.Distances[GetIndex(i),GetIndex(j)],4}");
                 Console.WriteLine();
             }
+            return this;
         }
+
+
     }
 
     class Program
     {
         //public static List<char> Keys="@abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ".ToList();
-        public static List<char> Keys="@dglsvzrchntaequbpwkjfmyxoiVZCGNELQWBSAHFJIKDMOPRTUXY".ToList();
+        public static List<char> Keys="@gvzVZsdclCnrhtaeEqQubApwHTRkKjJfFmMyYxXoOiBGNLWSIDOPU".ToList();
        
- 
+
         static void Main(string[] args)
         {
-            var root=new Maze.TestItem();
-
             var file=System.IO.File.ReadAllLines(args[0]);
             var initData=Maze.Parse(file);
             var copy=Maze.Parse(file);
             Maze m=new Maze(initData);
-
-            Console.WriteLine(m.Dump());
+            DistanceMatrix prev=m.BuildDistanceMatrix(Keys);
+            DistanceMatrix matrix=null;
+            prev.Dump();
+            (string,int) total=("",0);
+            (string,int) ret;
+            //Console.WriteLine(m.Dump());
+            m.BuildDistanceMatrix(Keys).Dump(); 
+            ret=m.FindBest(copy,'@',"gvz");
+            total=(total.Item1+ret.Item1,total.Item2+ret.Item2);
+            m.OpenDoor('V');
+            m.OpenDoor('Z');
+            //m.BuildDistanceMatrix(Keys).Dump(); 
+            ret=m.FindBest(copy,total.Item1.Last(),"sdcl");
+            total=(total.Item1+ret.Item1,total.Item2+ret.Item2);
+            m.OpenDoor('C');
+            //m.BuildDistanceMatrix(Keys).Dump(); 
+            ret=m.FindBest(copy,total.Item1.Last(),"nrhtae");
+            total=(total.Item1+ret.Item1,total.Item2+ret.Item2);
+            m.OpenDoor('E');
+            //m.BuildDistanceMatrix(Keys).Dump(); 
+            ret=m.FindBest(copy,total.Item1.Last(),"q");
+            total=(total.Item1+ret.Item1,total.Item2+ret.Item2);
+            m.OpenDoor('Q');
+            //m.BuildDistanceMatrix(Keys).Dump(); 
+            ret=m.FindBest(copy,total.Item1.Last(),"ub");
+            total=(total.Item1+ret.Item1,total.Item2+ret.Item2);
+            m.OpenDoor('A');
+            //m.BuildDistanceMatrix(Keys).Dump(); 
+            ret=m.FindBest(copy,total.Item1.Last(),"pw");
+            total=(total.Item1+ret.Item1,total.Item2+ret.Item2);
+            m.OpenDoor('H');
+            m.OpenDoor('T');
+            m.OpenDoor('R');
+           // m.BuildDistanceMatrix(Keys).Dump(); 
+            ret=m.FindBest(copy,total.Item1.Last(),"k");
+            total=(total.Item1+ret.Item1,total.Item2+ret.Item2);
+            m.OpenDoor('K');
+            //m.BuildDistanceMatrix(Keys).Dump(); 
+            ret=m.FindBest(copy,total.Item1.Last(),"j");
+            total=(total.Item1+ret.Item1,total.Item2+ret.Item2);
+            m.OpenDoor('J');
+            //m.BuildDistanceMatrix(Keys).Dump(); 
+            ret=m.FindBest(copy,total.Item1.Last(),"f");
+            total=(total.Item1+ret.Item1,total.Item2+ret.Item2);
+            m.OpenDoor('F');
+            //m.BuildDistanceMatrix(Keys).Dump(); 
+            ret=m.FindBest(copy,total.Item1.Last(),"m");
+            total=(total.Item1+ret.Item1,total.Item2+ret.Item2);
+            m.OpenDoor('M');
+            //m.BuildDistanceMatrix(Keys).Dump(); 
+            ret=m.FindBest(copy,total.Item1.Last(),"y");
+            total=(total.Item1+ret.Item1,total.Item2+ret.Item2);
+            m.OpenDoor('Y');
+            //m.BuildDistanceMatrix(Keys).Dump(); 
+            ret=m.FindBest(copy,total.Item1.Last(),"x");
+            total=(total.Item1+ret.Item1,total.Item2+ret.Item2);
+            m.OpenDoor('X');
+            m.BuildDistanceMatrix(Keys).Dump(); 
+            ret=m.FindBest(copy,total.Item1.Last(),"o");
+            total=(total.Item1+ret.Item1,total.Item2+ret.Item2);
+            m.OpenDoor('O');
+            Console.WriteLine($"Total distance : {total}");
 /*            var doorLocation=m.Each((x,y,c)=>c=='V').Single();
             m[doorLocation.x,doorLocation.y]='.';
             doorLocation=m.Each((x,y,c)=>c=='Z').Single(); // get access to CGNL
@@ -310,13 +415,6 @@ namespace Day18
             doorLocation=m.Each((x,y,c)=>c=='O').Single(); // get access to iI
             m[doorLocation.x,doorLocation.y]='.'; 
 */
-            var distanceMatrix=new DistanceMatrix();
-            foreach (var f in Keys)
-                foreach (var t in Keys)
-                    if (f!=t)
-                        distanceMatrix.Distances[distanceMatrix.GetIndex(f),distanceMatrix.GetIndex(t)]=m.CalcDist(f,t);
-
-            distanceMatrix.Dump();
 
 /*
             string prevPath="";

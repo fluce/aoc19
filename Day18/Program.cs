@@ -5,438 +5,116 @@ using Utils;
 
 namespace Day18
 {
-    public class Maze
+
+    public class Wall:Item
     {
-        public char[][] Data {get;set;}
-        public int Width {get; private set;}
-        public int Height {get; private set;}
-        public Maze(char[][] data)
-        {
-            Data=data;
-            Width=data[0].Length;
-            Height=data.Length;
-            mazeCells=Each((x,y,c)=>c!='#').Select(i=>(i.x,i.y)).ToArray();
-        }
 
-        (int x, int y)[] mazeCells;
-
-        public static char[][] Parse(string[] data)=>data.Select(x=>x.ToCharArray()).ToArray();
-
-        public char this[int x,int y] {
-            get {
-                return Data[y][x];
-            }
-            set {
-                Data[y][x]=value;
-            }
-        }
-
-        public IEnumerable<(int x,int y, char c)> Each(Func<int,int,char,bool> predicate)
-        {
-            for (int i=0;i<Width;i++)
-                for (int j=0;j<Width;j++)
-                    if (predicate?.Invoke(i,j,this[i,j])??true)
-                        yield return (i,j,this[i,j]);
-        }
-
-        public string Dump()
-        {
-            return string.Join("",Data.Select(x=>new string(x)+Environment.NewLine));
-        }
-
-
-        public int dist((int x,int y) a, (int x,int y) b)=>Math.Abs(a.x-b.x)+Math.Abs(a.y-b.y);
-
-        public IEnumerable<(int x, int y)> GetNeighbor((int x,int y) p, char target)
-        {
-            var (x,y)=p;
-            if (this[x-1,y]=='.') yield return (x-1,y);
-            else if (char.IsLower(this[x-1,y])) yield return (x-1,y);
-            else if (this[x-1,y]==target) yield return (x-1,y);
-            if (this[x+1,y]=='.') yield return (x+1,y);
-            else if (char.IsLower(this[x+1,y])) yield return (x+1,y);
-            else if (this[x+1,y]==target) yield return (x+1,y);
-            if (this[x,y-1]=='.') yield return (x,y-1);
-            else if (char.IsLower(this[x,y-1])) yield return (x,y-1);
-            else if (this[x,y-1]==target) yield return (x,y-1);
-            if (this[x,y+1]=='.') yield return (x,y+1);
-            else if (char.IsLower(this[x,y+1])) yield return (x,y+1);            
-            else if (this[x,y+1]==target) yield return (x,y+1);
-        }
-
-        public IEnumerable<(int x, int y)> GetNeighbor((int x,int y) p)
-        {
-            var (x,y)=p;
-            if (this[x-1,y]!='#') yield return (x-1,y);
-            if (this[x+1,y]!='#') yield return (x+1,y);
-            if (this[x,y-1]!='#') yield return (x,y-1);
-            if (this[x,y+1]!='#') yield return (x,y+1);
-         }
-
-        public int? CalcDist(char from, char to)
-        {
-            var start=Each((x,y,c)=>c==from).SingleOrDefault();
-            var dest=Each((x,y,c)=>c==to).SingleOrDefault();
-            if (start.x==0 || dest.x==0) return null;
-            var path=Utils.Dijkstra.FindBestPath<(int x,int y), Utils.Dijkstra.IntCost>(
-                mazeCells,
-                (start.x,start.y), (dest.x,dest.y),
-                a=>GetNeighbor(a,to),
-                (a,b)=>1
-            );
-            var d=path.LastOrDefault();
-            if (d.Node.x==0||d.Cost.Value==int.MaxValue)
-                return null;
-            return d.Cost.Value;
-        }
-
-        public int? FindBestPath((int x,int y) start, (int x,int y) dest)
-        {
-            var path=Utils.Dijkstra.FindBestPath<(int x,int y), Utils.Dijkstra.IntCost>(
-                Each((x,y,c)=>c!='#').Select(i=>(i.x,i.y)),
-                start, dest,
-                a=>GetNeighbor(a,this[dest.x,dest.y]),
-                (a,b)=>1
-            );
-
-            //Console.WriteLine($"Queue is empty ! {prevs.Count} {dists.Count}");            
-            var s=path.LastOrDefault();
-            return path.Any()?path.LastOrDefault().Cost.Value:(int?)null;
-            //foreach (var a in dists) if (a.Value<1000000) this[a.Key.x,a.Key.y]='+';
-            /*while (s!=start) {
-                s=prevs[s];
-                this[s.x,s.y]='*';
-            }*/
-            //Console.WriteLine(Dump());
-        }
-
-        public int? DistanceToTarget((int x,int y) start, char target)
-        {
-            //Console.WriteLine($"Search target {target} from {start}");
-            var dest=Each((x,y,c)=>c==target).Single();
-            var ret=FindBestPath((start.x,start.y),(dest.x, dest.y));
-            /*if (ret!=null)
-                Console.WriteLine($"Candidate target {target} at {dest} from {start} => dist={ret}");*/
-            return ret;
-        }
-
-        public (char key, int? dist) ChooseNextKey(IEnumerable<(char key, int? dist)> availableKeys)
-        {
-            return availableKeys.OrderBy(x=>x.dist).First();
-        }
-
-        public class TestItem
-        {
-            public string KeyPath;
-            public char Key;
-            public int? Dist;
-            public bool Completed;
-            public bool Tested;
-            public bool AllChildrenTested;
-            public bool Initialized;
-
-            public TestItem Parent;
-
-            public List<TestItem> Children;
-        }
-        public void Dump(TestItem item, int level=0)
-        {
-            Console.WriteLine($"{new string(' ',level)}{item.Key} {item.Dist} {item.Tested} {item.AllChildrenTested}");
-            if (item.Initialized)
-                foreach(var i in item.Children)
-                    Dump(i,level+1);
-        }
-
-        public void Recalc(TestItem item)
-        {
-            if (item.Initialized && !item.AllChildrenTested) {
-                bool flag=true;
-                foreach(var i in item.Children)
-                {
-                    Recalc(i);
-                    if (!i.AllChildrenTested) flag=false;
-                }
-                item.AllChildrenTested=flag;
-            }
-                    
-        }
-
-        public (string Path,int Dist) FindBest(char[][] copy,char startC, string stops)
-        {
-            var root=new Maze.TestItem();
-            string prevPath="";
-            string minPath="";
-            int min=int.MaxValue;
-            for(int i=0;i<Data.Length;i++) Array.Copy(Data[i],copy[i],copy[i].Length);
-
-            do {
-                for(int i=0;i<Data.Length;i++) Array.Copy(copy[i],Data[i],copy[i].Length);
-                var (path,len,c)=Solve(root, min, startC,stops);
-                if (len>=0) {
-                    if (len<min)
-                    {
-                        min=len;
-                        minPath=path;
-                    } else {
-                        if (path==prevPath) break;
-                        prevPath=path;
-                    }
-                }
-                Recalc(root);
-            } while(!root.AllChildrenTested);
-            Console.WriteLine($"Optimal path : {minPath} => {min}");
-            for(int i=0;i<Data.Length;i++) Array.Copy(copy[i],Data[i],copy[i].Length);
-            return (minPath,min); 
-        }
-
-        public (string,int,int) Solve(TestItem root, int currentMinDist, char startC, string stops)
-        {
-            var start=Each((x,y,c)=>c==startC).Single();
-            //Console.WriteLine($"starting at {start}");
-
-            int totalDist=0;
-            string orderedKeys="";
-            TestItem item=root;
-
-            int counter=0;
-
-            List<char> keys=stops.ToList();
-
-            while (keys.Count>0) {
-                if (!item.Initialized) {
-                    item.Children=keys.Select(x=>(x,DistanceToTarget((start.x,start.y),x))).Where(x=>x.Item2!=null).OrderBy(x=>x.Item2.Value).Select(x=>new TestItem { KeyPath=orderedKeys, Key=x.x, Dist=x.Item2, Parent=item }).ToList();
-                    item.Initialized=true;
-                }
-                //Console.WriteLine($"{orderedKeys} availableKeys={new string(item.Children.Where(x=>!x.Tested).Select(x=>x.Key).ToArray())}");
-                var next=item.Children.FirstOrDefault(x=>!x.Tested);
-                if (next==null) {
-                    next=item.Children.FirstOrDefault(x=>!x.AllChildrenTested);
-                    if (next==null) {
-                        //Console.WriteLine($"{orderedKeys} depleted");
-                        item.AllChildrenTested=true;
-                        return ("",-1,counter);
-                    }        
-                }
-                item=next;
-                item.Tested=true;
-                totalDist+=item.Dist.Value;
-                if (totalDist>currentMinDist) { item.AllChildrenTested=true; /*Console.WriteLine($"{orderedKeys} skipped => {totalDist}");*/ return ("", -2, counter); }
-                //Console.WriteLine($"{orderedKeys} Key {item.Key}, totalDist={totalDist} ({item.Tested})");
-                //var doorLocation=Each((x,y,c)=>c==char.ToUpper(item.Key)).Single();
-                //Console.WriteLine($"Opening door at {doorLocation}");
-                //this[doorLocation.x,doorLocation.y]='.'; // open door
-                var keyLocation=Each((x,y,c)=>c==item.Key).Single();
-                this[keyLocation.x,keyLocation.y]='.'; // remove key
-                keys.Remove(item.Key); // remove key;
-                orderedKeys+=item.Key;
-                start=keyLocation;     
-                counter++;           
-            }
-            item.Completed=true;
-            item.AllChildrenTested=true;
-            Console.WriteLine($"{orderedKeys} completed => {totalDist}");
-
-            return (orderedKeys, totalDist, counter);
-        }
-        public void OpenDoor(char door) 
-        {
-            var doorLocation=Each((x,y,c)=>c==door).Single();
-            this[doorLocation.x,doorLocation.y]='.';
-        }
-
-        public DistanceMatrix BuildDistanceMatrix(IEnumerable<char> keys)
-        {
-            var distanceMatrix=new DistanceMatrix();
-            foreach (var f in keys)
-                foreach (var t in keys)                    
-                    distanceMatrix.Distances[distanceMatrix.GetIndex(f),distanceMatrix.GetIndex(t)]=f==t?0:CalcDist(f,t);
-            return distanceMatrix;
-        }
     }
 
-    public class DistanceMatrix
+    public class Item
     {
-        public int?[,] Distances{get;}=new int?[53,53];
+        public char? Key {get;set;}
+        public char? Door {get;set;}
+    }
 
-        public int GetIndex(char c)
-        {
-            if (c=='@') return 0;
-            if (char.IsLower(c)) 
-            {
-                return 1+Convert.ToInt32(c)-Convert.ToInt32('a');
-            } else 
-                return 27+Convert.ToInt32(c)-Convert.ToInt32('A');
-        }
+    public class Node
+    {
+        public char Key {get;set;}
+        public int Distance {get;set;}
+        public List<char> Doors {get;set;}
+        public List<char> Ways {get;set;}
 
-        public DistanceMatrix Dump(DistanceMatrix prev=null)
+        public override string ToString() => $"{Key} d={Distance} doors={new string(Doors.ToArray())} ways={new string(Ways.ToArray())}";
+    }
+    public class Maze
+    {
+        Table<Item> Data;
+        Dictionary<char,(int x,int y)> Keys=new Dictionary<char, (int x, int y)>();
+
+        Dictionary<char, List<Node>> Graph=new Dictionary<char, List<Node>>();
+
+        public Maze(string[] input)
         {
-            Console.Write("  ");
-            foreach(var i in Program.Keys)
-                Console.Write($"{i,4}");
-            Console.WriteLine();
-            foreach(var j in Program.Keys)
-            {
-                Console.Write($"{j} ");
-                foreach(var i in Program.Keys)
-                    if (prev==null)
-                        Console.Write($"{Distances[GetIndex(i),GetIndex(j)],4}");
-                    else
-                        Console.Write($"{Distances[GetIndex(i),GetIndex(j)]-prev.Distances[GetIndex(i),GetIndex(j)],4}");
-                Console.WriteLine();
+            Data=Table<Item>.Parse(input, (p,c)=>
+                c switch {
+                    '#'=>null,
+                    '.'=>new Item(),
+                    _ => new Item() { Key=char.IsLower(c)?c:(char?)null, Door=char.IsUpper(c)?c:(char?)null }
+                }
+            );
+            Keys=Data.Each((x,y,i)=>i?.Key.HasValue??false).ToDictionary(x=>x.Item.Key.Value, x=>(x.X,x.Y));
+
+            foreach(var k in Keys.Keys)
+                Graph[k]=ListNeighbors(k).ToList();
+
+            foreach(var k in Keys.Keys) {
+                Console.WriteLine($"Graph '{k}'");
+                foreach(var a in Graph[k])
+                    Console.WriteLine($"  {a}");
             }
-            return this;
         }
 
+        readonly (int dx,int dy)[] directions = new (int dx,int dy)[] { (0,-1),(1,0),(0,1),(-1,0) };
 
+        public IEnumerable<Node> ListNeighbors(char n)
+        {
+            var visited=new HashSet<(int x,int y)>();
+            var distance=new Dictionary<(int x,int y),int>();
+            var doors=new Dictionary<(int x,int y),List<char>>();
+            var ways=new Dictionary<(int x,int y),List<char>>();
+
+            var k=Keys[n]; // key position
+            visited.Add(k);
+            distance[k]=0;
+            doors[k]=new List<char>();
+            ways[k]=new List<char>();
+            var stack=new Stack<(int x,int y)>();
+            stack.Push(k);
+            while (stack.Count>0)
+            {
+                var u=stack.Pop();
+                foreach(var d in directions)
+                {
+                    var v=(x:u.x+d.dx, y:u.y+d.dy);
+                    var item=Data[v];
+                    
+                    if (item==null)
+                        continue;
+                    
+                    if (visited.Contains(v))
+                        continue;
+
+                    distance[v]=distance[u]+1;
+                    doors[v]=doors[u].ToList();
+                    ways[v]=ways[u].ToList();
+
+                    visited.Add(v);
+
+                    if (item.Door!=null) doors[v].Add(item.Door.Value);
+
+                    if (item.Key!=null) 
+                    {
+                        yield return new Node {
+                            Key=item.Key.Value,
+                            Distance=distance[v],
+                            Doors=doors[v],
+                            Ways=ways[v].ToList()
+                        };
+                        ways[v].Add(item.Key.Value);
+                    }
+                    stack.Push(v);
+                }
+            }
+        }
     }
 
     class Program
     {
-        //public static List<char> Keys="@abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ".ToList();
-        public static List<char> Keys="@gvzVZsdclCnrhtaeEqQubApwHTRkKjJfFmMyYxXoOiBGNLWSIDOPU".ToList();
-       
 
         static void Main(string[] args)
         {
             var file=System.IO.File.ReadAllLines(args[0]);
-            var initData=Maze.Parse(file);
-            var copy=Maze.Parse(file);
-            Maze m=new Maze(initData);
-            DistanceMatrix prev=m.BuildDistanceMatrix(Keys);
-            DistanceMatrix matrix=null;
-            prev.Dump();
-            (string,int) total=("",0);
-            (string,int) ret;
-            //Console.WriteLine(m.Dump());
-            m.BuildDistanceMatrix(Keys).Dump(); 
-            ret=m.FindBest(copy,'@',"gvz");
-            total=(total.Item1+ret.Item1,total.Item2+ret.Item2);
-            m.OpenDoor('V');
-            m.OpenDoor('Z');
-            //m.BuildDistanceMatrix(Keys).Dump(); 
-            ret=m.FindBest(copy,total.Item1.Last(),"sdcl");
-            total=(total.Item1+ret.Item1,total.Item2+ret.Item2);
-            m.OpenDoor('C');
-            //m.BuildDistanceMatrix(Keys).Dump(); 
-            ret=m.FindBest(copy,total.Item1.Last(),"nrhtae");
-            total=(total.Item1+ret.Item1,total.Item2+ret.Item2);
-            m.OpenDoor('E');
-            //m.BuildDistanceMatrix(Keys).Dump(); 
-            ret=m.FindBest(copy,total.Item1.Last(),"q");
-            total=(total.Item1+ret.Item1,total.Item2+ret.Item2);
-            m.OpenDoor('Q');
-            //m.BuildDistanceMatrix(Keys).Dump(); 
-            ret=m.FindBest(copy,total.Item1.Last(),"ub");
-            total=(total.Item1+ret.Item1,total.Item2+ret.Item2);
-            m.OpenDoor('A');
-            //m.BuildDistanceMatrix(Keys).Dump(); 
-            ret=m.FindBest(copy,total.Item1.Last(),"pw");
-            total=(total.Item1+ret.Item1,total.Item2+ret.Item2);
-            m.OpenDoor('H');
-            m.OpenDoor('T');
-            m.OpenDoor('R');
-           // m.BuildDistanceMatrix(Keys).Dump(); 
-            ret=m.FindBest(copy,total.Item1.Last(),"k");
-            total=(total.Item1+ret.Item1,total.Item2+ret.Item2);
-            m.OpenDoor('K');
-            //m.BuildDistanceMatrix(Keys).Dump(); 
-            ret=m.FindBest(copy,total.Item1.Last(),"j");
-            total=(total.Item1+ret.Item1,total.Item2+ret.Item2);
-            m.OpenDoor('J');
-            //m.BuildDistanceMatrix(Keys).Dump(); 
-            ret=m.FindBest(copy,total.Item1.Last(),"f");
-            total=(total.Item1+ret.Item1,total.Item2+ret.Item2);
-            m.OpenDoor('F');
-            //m.BuildDistanceMatrix(Keys).Dump(); 
-            ret=m.FindBest(copy,total.Item1.Last(),"m");
-            total=(total.Item1+ret.Item1,total.Item2+ret.Item2);
-            m.OpenDoor('M');
-            //m.BuildDistanceMatrix(Keys).Dump(); 
-            ret=m.FindBest(copy,total.Item1.Last(),"y");
-            total=(total.Item1+ret.Item1,total.Item2+ret.Item2);
-            m.OpenDoor('Y');
-            //m.BuildDistanceMatrix(Keys).Dump(); 
-            ret=m.FindBest(copy,total.Item1.Last(),"x");
-            total=(total.Item1+ret.Item1,total.Item2+ret.Item2);
-            m.OpenDoor('X');
-            m.BuildDistanceMatrix(Keys).Dump(); 
-            ret=m.FindBest(copy,total.Item1.Last(),"o");
-            total=(total.Item1+ret.Item1,total.Item2+ret.Item2);
-            m.OpenDoor('O');
-            Console.WriteLine($"Total distance : {total}");
-/*            var doorLocation=m.Each((x,y,c)=>c=='V').Single();
-            m[doorLocation.x,doorLocation.y]='.';
-            doorLocation=m.Each((x,y,c)=>c=='Z').Single(); // get access to CGNL
-            m[doorLocation.x,doorLocation.y]='.';
-            doorLocation=m.Each((x,y,c)=>c=='C').Single(); // get access to eS
-            m[doorLocation.x,doorLocation.y]='.';
-            doorLocation=m.Each((x,y,c)=>c=='G').Single(); // get access to B
-            m[doorLocation.x,doorLocation.y]='.'; 
-            doorLocation=m.Each((x,y,c)=>c=='N').Single(); // get access to 
-            m[doorLocation.x,doorLocation.y]='.'; 
-            doorLocation=m.Each((x,y,c)=>c=='L').Single(); // get access to 
-            m[doorLocation.x,doorLocation.y]='.'; 
-            doorLocation=m.Each((x,y,c)=>c=='E').Single(); // get access to qQ
-            m[doorLocation.x,doorLocation.y]='.';             
-            doorLocation=m.Each((x,y,c)=>c=='Q').Single(); // get access to ubUB
-            m[doorLocation.x,doorLocation.y]='.';               
-            doorLocation=m.Each((x,y,c)=>c=='U').Single(); // get access to 
-            m[doorLocation.x,doorLocation.y]='.';               
-            doorLocation=m.Each((x,y,c)=>c=='B').Single(); // get access to 
-            m[doorLocation.x,doorLocation.y]='.';   
-            doorLocation=m.Each((x,y,c)=>c=='A').Single(); // get access to pwH
-            m[doorLocation.x,doorLocation.y]='.';                           
-            doorLocation=m.Each((x,y,c)=>c=='S').Single(); // get access to D
-            m[doorLocation.x,doorLocation.y]='.';                           
-            doorLocation=m.Each((x,y,c)=>c=='H').Single(); // get access to T
-            m[doorLocation.x,doorLocation.y]='.';                           
-            doorLocation=m.Each((x,y,c)=>c=='W').Single(); // get access to P
-            m[doorLocation.x,doorLocation.y]='.';                           
-            doorLocation=m.Each((x,y,c)=>c=='P').Single(); // get access to 
-            m[doorLocation.x,doorLocation.y]='.';                           
-            doorLocation=m.Each((x,y,c)=>c=='D').Single(); // get access to 
-            m[doorLocation.x,doorLocation.y]='.';   
-            doorLocation=m.Each((x,y,c)=>c=='T').Single(); // get access to R
-            m[doorLocation.x,doorLocation.y]='.'; 
-            doorLocation=m.Each((x,y,c)=>c=='R').Single(); // get access to kK
-            m[doorLocation.x,doorLocation.y]='.'; 
-            doorLocation=m.Each((x,y,c)=>c=='K').Single(); // get access to jJ
-            m[doorLocation.x,doorLocation.y]='.'; 
-            doorLocation=m.Each((x,y,c)=>c=='J').Single(); // get access to fF
-            m[doorLocation.x,doorLocation.y]='.'; 
-            doorLocation=m.Each((x,y,c)=>c=='F').Single(); // get access to mM
-            m[doorLocation.x,doorLocation.y]='.'; 
-            doorLocation=m.Each((x,y,c)=>c=='M').Single(); // get access to yY
-            m[doorLocation.x,doorLocation.y]='.'; 
-            doorLocation=m.Each((x,y,c)=>c=='Y').Single(); // get access to xX
-            m[doorLocation.x,doorLocation.y]='.'; 
-            doorLocation=m.Each((x,y,c)=>c=='X').Single(); // get access to oO
-            m[doorLocation.x,doorLocation.y]='.'; 
-            doorLocation=m.Each((x,y,c)=>c=='O').Single(); // get access to iI
-            m[doorLocation.x,doorLocation.y]='.'; 
-*/
-
-/*
-            string prevPath="";
-            string minPath="";
-            int min=int.MaxValue;
-            do {
-                for(int i=0;i<m.Data.Length;i++) Array.Copy(copy[i],m.Data[i],copy[i].Length);
-                var (path,len,c)=m.Solve(root, min);
-                if (len>=0) {
-                    if (len<min)
-                    {
-                        min=len;
-                        minPath=path;
-                    } else {
-                        if (path==prevPath) break;
-                        prevPath=path;
-                    }
-                }
-                m.Recalc(root);
-            } while(!root.AllChildrenTested);
-            //m.Dump(root);
-            */
+            Maze m=new Maze(file);
         }
     }
 }
